@@ -1,0 +1,14 @@
+Package: dynpan
+Title: Dynamics estimation for multiple time series
+Version: 0.1
+Author: Tilo Wiklund <tilo@wiklund.co>
+Maintainer Tilo Wiklund <tilo@wiklund.co>
+Authors@R: "Tilo Wiklund <tilo@wiklund.co> [aut, cre]"
+Description: Procedures for estimating shared dynamics for multiple time series.
+Depends: R (>= 3.0.1)
+Imports:
+    data.table (>= 1.8)
+Suggests:
+    testthat (>= 0.8)
+License: BSD_3_clause + file LICENSE
+LazyData: true
