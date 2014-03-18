@@ -32,7 +32,7 @@
 #' Add spatial index to a time.table
 #'
 #' @export
-flanner.by.measurement <- function(tt, include.auxiliary=FALSE)
+flanner_by_measurement <- function(tt, include.auxiliary=FALSE)
     flanner(tt, c( measurement_names(tt)
                  , if(include.auxiliary) auxiliary_names(tt) else c() ))
 
@@ -149,10 +149,22 @@ local_polynomial_fits <- function( tt, points, k
 local_polynomial_derivatives <- function(tt, k, timesteps=NULL, times=NULL, ...)
     same_str_as(local_polynomial_fits(tt, tt, k=k, timesteps=timesteps, times=times, ...), tt)
 
+#' Diff time table in order to estimate derivatives of a time.table
+#'
+#' @export
+step_derivatives <- function(tt, ...) {
+    dtt <- diff(tt)
+    dscale <- deltat(tt)
+    for(col in measurement_names(tt)) {
+        dtt[,eval(col):=.SD[[col]]*dscale]
+    }
+    dtt
+}
+
 #' Orthogonal polynomials
 #'
 #' @export
-ortho.polymodel <- function(xs, degree) {
+ortho_polymodel <- function(xs, degree) {
     result <- poly(xs, degree=degree, raw=FALSE)
     function(ys) predict.poly(ys, result)
 }
@@ -164,7 +176,7 @@ time_table_leaps <- function( x, y=NULL, idxs=NULL
                             , use.auxiliary=FALSE
                             , input.cols=NULL, output.cols=NULL
                             , ...
-                            , modelfun=polymodel
+                            , modelfun=function(xs) poly(xs, degree=2, raw=T)
                             , has.no.na=FALSE ){
     if(!is.null(y)) stopifnot( setequal(index_names(x), index_names(y)) &
                                time_name(x) == time_name(y) )
