@@ -29,10 +29,16 @@
 ## (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ## OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#' Add spatial index to a time.table
+#'
+#' @export
 flanner.by.measurement <- function(tt, include.auxiliary=FALSE)
     flanner(tt, c( measurement_names(tt)
                  , if(include.auxiliary) auxiliary_names(tt) else c() ))
 
+#' Find indices of neighbouring points
+#'
+#' @export
 lookup_neighbour_indices <- function( tt, points, k
                                     , only.indices=TRUE
                                     , ...) {
@@ -40,6 +46,9 @@ lookup_neighbour_indices <- function( tt, points, k
     knn_lookup(tt, points, k, df.cols=cols, ...)
 }
 
+#' "Pad" a range aroun the values of a column
+#'
+#' @export
 lag_column <- function(dt, col, times, lag.name=NULL) {
     dt <- dt[rep(seq_len(nrow(dt)), each=length(times)),]
     ##dt[[col]] <- dt[[col]] + times
@@ -51,6 +60,9 @@ lag_column <- function(dt, col, times, lag.name=NULL) {
     dt
 }
 
+#' Find neighbouring trajectories
+#'
+#' @export
 lookup_neighbour_trajectories <- function( tt, points, k
                                          , timesteps=NULL
                                          , times=NULL
@@ -68,9 +80,19 @@ lookup_neighbour_trajectories <- function( tt, points, k
     result
 }
 
+#' A simple and stupid weight function
+#'
+#' @export
 simple_weight_function <- function(d, dt, h=0.1) exp(-d/h - abs(dt))
+
+#' Constant weight function
+#'
+#' @export
 constant_weight_function <- function(d, dt) 1
 
+#' Fit local polynomial models to estimate derivatives
+#'
+#' @export
 local_polynomial_fits <- function( tt, points, k
                                  , timesteps=NULL, times=NULL
                                  , degree=2
@@ -121,12 +143,24 @@ local_polynomial_fits <- function( tt, points, k
     data.table(diff, points[row.idxs, vars, with=F])
 }
 
+#' Fit local polynomial models to estimate derivatives of a time.table
+#'
+#' @export
+local_polynomial_derivatives <- function(tt, k, timesteps=NULL, times=NULL, ...)
+    same_str_as(local_polynomial_fits(tt, tt, k=k, timesteps=timesteps, times=times, ...), tt)
+
+#' Orthogonal polynomials
+#'
+#' @export
 ortho.polymodel <- function(xs, degree) {
     result <- poly(xs, degree=degree, raw=FALSE)
     function(ys) predict.poly(ys, result)
 }
 
-time.table.leaps <- function( x, y=NULL, idxs=NULL
+#' Perform all subsets regression on a time.table
+#'
+#' @export
+time_table_leaps <- function( x, y=NULL, idxs=NULL
                             , use.auxiliary=FALSE
                             , input.cols=NULL, output.cols=NULL
                             , ...
@@ -281,7 +315,10 @@ time.table.leaps <- function( x, y=NULL, idxs=NULL
         , raw=estimations )
 }
 
-time.table.lars <- function( x, y=NULL, idxs=NULL
+#' Perform lasso regression on a time.table
+#'
+#' @export
+time_table_lars <- function( x, y=NULL, idxs=NULL
                            , use.auxiliary=FALSE
                            , input.cols=NULL, output.cols=NULL
                            , ...
