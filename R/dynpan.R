@@ -156,7 +156,7 @@ step_derivatives <- function(tt, ...) {
     dtt <- diff(tt)
     dscale <- deltat(tt)
     for(col in measurement_names(tt)) {
-        dtt[,eval(col):=.SD[[col]]*dscale]
+        dtt[,eval(col):=.SD[[col]]/dscale]
     }
     dtt
 }
