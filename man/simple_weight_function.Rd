@@ -4,7 +4,15 @@
 \usage{
 simple_weight_function(d, dt, h = 0.1)
 }
+\arguments{
+  \item{d}{trajectory distance}
+
+  \item{dt}{time distance}
+
+  \item{h}{gaussian kernel bandwidth}
+}
 \description{
-A simple and stupid weight function
+A simplistic weight function for local regression. This
+probably won't be around for long...
 }
 

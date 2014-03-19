@@ -84,7 +84,7 @@ lookup_neighbour_indices <- function( tt, points, k
 #' @param dt \code{data.table} to pad column in
 #' @param col column to pad
 #' @param times sequence of values to perturb \code{col} by
-#' @param lag.name name to use for column with \code{times} values in in the resulting \code{data.table}, \coe{NULL} (default) to not include such a column
+#' @param lag.name name to use for column with \code{times} values in in the resulting \code{data.table}, \code{NULL} (default) to not include such a column
 #'
 #' @details Useful for constructing a \code{data.table} containing all points
 #' "around" the values in \code{dt}. For example, by applying \code{pad_column}

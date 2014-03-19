@@ -6,4 +6,7 @@
 #' @import data.table
 #' @import timetablr
 #' @import flanner
+#'
+#' @import lars
+#' @import leaps
 NULL
