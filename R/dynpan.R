@@ -279,14 +279,6 @@ step_derivatives <- function(tt, ...) {
     dtt
 }
 
-#' Orthogonal polynomials
-#'
-#' @export
-ortho_polymodel <- function(xs, degree) {
-    result <- poly(xs, degree=degree, raw=FALSE)
-    function(ys) predict.poly(ys, result)
-}
-
 #' Perform all subsets regression on a time.table
 #'
 #' @export
@@ -294,7 +286,7 @@ time_table_leaps <- function( x, y=NULL, idxs=NULL
                             , use.auxiliary=FALSE
                             , input.cols=NULL, output.cols=NULL
                             , ...
-                            , modelfun=function(xs) poly(xs, degree=2, raw=T)
+                            , modelfun=function(x) poly(raw=TRUE, x, degree=2)
                             , has.no.na=FALSE ){
     if(!is.null(y)) stopifnot( setequal(index_names(x), index_names(y)) &
                                time_name(x) == time_name(y) )
@@ -346,7 +338,6 @@ time_table_leaps <- function( x, y=NULL, idxs=NULL
     data.matrix <- as.matrix(x[idxs, input.cols, with=F])
     resp.matrix <- as.matrix(y[idxs, output.cols, with=F])
     design.matrix <- modelfun(data.matrix, ...)
-    new.modelfun <- maybe(attr(design.matrix, "model"), modelfun)
     # as a tempfix required by lars, normalize the design.matrix
     # design.matrix <- t(aaply(design.matrix, 2, standardise))
     #
@@ -437,7 +428,7 @@ time_table_leaps <- function( x, y=NULL, idxs=NULL
     }
     #
     list( stats=stats
-        , modelfun=maybe(attr(design.matrix, "model"), modelfun)
+        , modelfun=modelfun
         , coef.fun=extr.coef
         , all.coefs=all.coef
         , predict.single=pred.sing
@@ -452,7 +443,7 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
                            , use.auxiliary=FALSE
                            , input.cols=NULL, output.cols=NULL
                            , ...
-                           , modelfun=polymodel
+                           , modelfun=modelfun
                            , has.no.na=FALSE ) {
     if(!is.null(y)) stopifnot( setequal(index_names(x), index_names(y)) &
                                time_name(x) == time_name(y) )
@@ -504,7 +495,6 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
     data.matrix <- as.matrix(x[idxs, input.cols, with=F])
     resp.matrix <- as.matrix(y[idxs, output.cols, with=F])
     design.matrix <- modelfun(data.matrix, ...)
-    new.modelfun <- maybe(attr(design.matrix, "model"), modelfun)
     #
     estimations <- apply(resp.matrix, 2, function(resp) {
         lars( design.matrix, resp
@@ -549,7 +539,7 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
     pred <- function(ids, newdata, model.id.name="model") {
         new.data.matrix <- as.matrix(newdata[,input.cols,with=F])
         other.data.vars <- setdiff(colnames(newdata), input.cols)
-        new.design.matrix <- new.modelfun(new.data.matrix)
+        new.design.matrix <- modelfun(new.data.matrix)
         lapply(names(ids), function(fac) {
             preds <- data.table(predict.lars( estimations[[fac]]
                                             , new.design.matrix
@@ -576,13 +566,13 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
         }
         function(v) {
             if(!is.null(names(v))) v <- v[input.cols]
-            mdl <- c(1, new.modelfun(matrix(rep(v,each=2), nrow=2))[1,])
+            mdl <- c(1, modelfun(matrix(rep(v,each=2), nrow=2))[1,])
             mdl %*% beta
         }
     }
     #
     list( stats=stats
-        , modelfun=new.modelfun
+        , modelfun=modelfun
         , coef.fun=extr.coef
         , all.coefs=all.coefs
         , predict=pred
