@@ -354,9 +354,10 @@ time_table_leaps <- function( x, y=NULL, idxs=NULL
     })
     #
     all.coef <- lapply(setNames(nm=output.cols), function(fac) {
-        cfm <- matrix(0, nrow=ncol(design.matrix), ncol=ncol(design.matrix)+1)
+        nmodel <- estimations[[fac]]$nvmax - estimations[[fac]]$intercept
+        cfm <- matrix(0, nrow=nmodel, ncol=ncol(design.matrix)+1)
         colnames(cfm) <- c("(Intercept)", colnames(design.matrix))
-	for(id in seq_len(ncol(design.matrix))) {
+	for(id in seq_len(nmodel)) {
             cf <- coef(estimations[[fac]], id)
             cfm[id, names(cf)] <- cf
         }
@@ -413,25 +414,25 @@ time_table_leaps <- function( x, y=NULL, idxs=NULL
         })
     }
     #
-    pred.sing <- function(modelids) {
-        #poly doesn't work on a single row...
-        modelids <- modelids[c(output.cols)]
-        beta <- matrix(0, ncol=length(output.cols), nrow=ncol(design.matrix)+1)
-        for(i in seq_along(output.cols)) {
-            beta[,i] <- all.coef[[output.cols[i]]][,modelids[[i]]]
-        }
-        function(v) {
-            if(!is.null(names(v))) v <- v[input.cols]
-            mdl <- c(1, modelfun(matrix(rep(v,each=2), nrow=2))[1,])
-            mdl %*% beta
-        }
-    }
+    ## pred.sing <- function(modelids) {
+    ##     #poly doesn't work on a single row...
+    ##     modelids <- modelids[c(output.cols)]
+    ##     beta <- matrix(0, ncol=length(output.cols), nrow=ncol(design.matrix)+1)
+    ##     for(i in seq_along(output.cols)) {
+    ##         beta[,i] <- all.coef[[output.cols[i]]][,modelids[[i]]]
+    ##     }
+    ##     function(v) {
+    ##         if(!is.null(names(v))) v <- v[input.cols]
+    ##         mdl <- c(1, modelfun(matrix(rep(v,each=2), nrow=2))[1,])
+    ##         mdl %*% beta
+    ##     }
+    ## }
     #
     list( stats=stats
         , modelfun=modelfun
         , coef.fun=extr.coef
         , all.coefs=all.coef
-        , predict.single=pred.sing
+        ## , predict.single=pred.sing
         , predict=pred
         , raw=estimations )
 }
@@ -557,25 +558,25 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
         })
     }
     #
-    pred.sing <- function(modelids) {
-        #poly doesn't work on a single row...
-        modelids <- modelids[c(output.cols)]
-        beta <- matrix(0, ncol=length(output.cols), nrow=ncol(design.matrix)+1)
-        for(i in seq_along(output.cols)) {
-            beta[,i] <- all.coefs[[output.cols[i]]][,modelids[[i]]]
-        }
-        function(v) {
-            if(!is.null(names(v))) v <- v[input.cols]
-            mdl <- c(1, modelfun(matrix(rep(v,each=2), nrow=2))[1,])
-            mdl %*% beta
-        }
-    }
+    ## pred.sing <- function(modelids) {
+    ##     #poly doesn't work on a single row...
+    ##     modelids <- modelids[c(output.cols)]
+    ##     beta <- matrix(0, ncol=length(output.cols), nrow=ncol(design.matrix)+1)
+    ##     for(i in seq_along(output.cols)) {
+    ##         beta[,i] <- all.coefs[[output.cols[i]]][,modelids[[i]]]
+    ##     }
+    ##     function(v) {
+    ##         if(!is.null(names(v))) v <- v[input.cols]
+    ##         mdl <- c(1, modelfun(matrix(rep(v,each=2), nrow=2))[1,])
+    ##         mdl %*% beta
+    ##     }
+    ## }
     #
     list( stats=stats
         , modelfun=modelfun
         , coef.fun=extr.coef
         , all.coefs=all.coefs
         , predict=pred
-        , predict.single=pred.sing
+        ## , predict.single=pred.sing
         , raw=estimations )
 }
