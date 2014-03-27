@@ -443,7 +443,7 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
                            , use.auxiliary=FALSE
                            , input.cols=NULL, output.cols=NULL
                            , ...
-                           , modelfun=modelfun
+                           , modelfun=function(x) poly(x, raw=TRUE, degree=2)
                            , has.no.na=FALSE ) {
     if(!is.null(y)) stopifnot( setequal(index_names(x), index_names(y)) &
                                time_name(x) == time_name(y) )
