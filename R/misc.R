@@ -83,3 +83,11 @@ safe_name <- function(..., num=1, extra=c(), sep=".") {
     attr(names, "prefix") <- name.base
     names
 }
+
+polySane <- function(x, degree = 1, raw = FALSE) {
+    if(nrow(x) == 1) {
+        poly(x[c(1,1),], degree=degree, raw=raw)[1,,drop=FALSE]
+    } else {
+        poly(x, degree=degree, raw=raw)
+    }
+}

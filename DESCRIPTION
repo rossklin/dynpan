@@ -13,6 +13,7 @@ Imports:
     timetablr (>= 0.1)
 Suggests:
     testthat (>= 0.8),
+    randat (>= 0.1),
     leaps,
     lars
 License: BSD_3_clause + file LICENSE
