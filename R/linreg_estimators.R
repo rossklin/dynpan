@@ -90,8 +90,23 @@ regression_matrices <- function( x, y=NULL, idxs=NULL
         , input.cols = input.cols, output.cols = output.cols )
 }
 
-#' Perform all subsets regression on a time.table
+#' Best subset (linear) regression on a time.table
 #'
+#' Perform a best subsets regression procedure on data stored in
+#' time.table(s). Produces one linear regression subset (the one with the lowest
+#' residual sum of squares) for each subset size of the covariates and each
+#' component of the dependent variable.
+#'
+#' @param x \code{time.table} that contains predictors and, optionally, dependent variable(s).
+#' @param y \code{time.table} containing dependent variable(s).
+#' @param idxs index/time values to include, defaults to all complete cases
+#' @param use.auxiliary whether to include auxiliary values
+#' @param input.cols column(s) of \code{x} to use for computing covariate(s)
+#' @param output.cols column(s) of \code{x} or \code{y} to use as dependent varaiable(s)
+#' @param ... additional arguments to pass to \code{modelfun}
+#' @param modelfun function that produces the actual covariates used in the linear regression
+#' @param has.no.na whether user guarantees \code{x}/\code{y} contian no \code{NA} values
+#' 
 #' @export
 time_table_leaps <- function( x, y=NULL, idxs=NULL
                             , use.auxiliary=FALSE
@@ -229,6 +244,16 @@ predict.dynpan_leaps <- function(dp, newdata, ids=NULL) {
 
 #' Perform lasso regression on a time.table
 #'
+#' @param x \code{time.table} that contains predictors and, optionally, dependent variable(s).
+#' @param y \code{time.table} containing dependent variable(s).
+#' @param idxs index/time values to include, defaults to all complete cases
+#' @param use.auxiliary whether to include auxiliary values
+#' @param input.cols column(s) of \code{x} to use for computing covariate(s)
+#' @param output.cols column(s) of \code{x} or \code{y} to use as dependent varaiable(s)
+#' @param ... additional arguments to pass to \code{modelfun}
+#' @param modelfun function that produces the actual covariates used in the linear regression
+#' @param has.no.na whether user guarantees \code{x}/\code{y} contian no \code{NA} values
+#' 
 #' @export
 time_table_lars <- function( x, y=NULL, idxs=NULL
                            , use.auxiliary=FALSE
