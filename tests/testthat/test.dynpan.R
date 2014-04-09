@@ -218,7 +218,7 @@ test_that("coef.dynpan_leaps produces list of matrices", {
         context(paste("Table:", nm))
         with(test.tables[[nm]], {
             if(number$measurement > 0 & number$measurement < 4) {
-                tt2 <- copy(tt)number$measurement > 1 & (number$entities > 1 | number$timepoint > 1)
+                tt2 <- copy(tt)
                 perturb_measurement(tt2)
                 fit <- suppressWarnings(time_table_leaps(tt2, tt))
                 include.facs <- names$measurement[seq(1, number$measurement, 2)]
