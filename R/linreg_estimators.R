@@ -247,6 +247,7 @@ predict.dynpan_leaps <- function(dp, newdata, ids=NULL) {
 #' @param x \code{time.table} that contains predictors and, optionally, dependent variable(s).
 #' @param y \code{time.table} containing dependent variable(s).
 #' @param idxs index/time values to include, defaults to all complete cases
+#' @param adaptive exponent used for the adaptive weights set to \code{NULL} or \code{0} to disable (defaults to 0.5)
 #' @param use.auxiliary whether to include auxiliary values
 #' @param input.cols column(s) of \code{x} to use for computing covariate(s)
 #' @param output.cols column(s) of \code{x} or \code{y} to use as dependent varaiable(s)
@@ -256,11 +257,14 @@ predict.dynpan_leaps <- function(dp, newdata, ids=NULL) {
 #' 
 #' @export
 time_table_lars <- function( x, y=NULL, idxs=NULL
+                           , adaptive=0.5
+                           , normalise=TRUE
                            , use.auxiliary=FALSE
                            , input.cols=NULL, output.cols=NULL
                            , ...
                            , modelfun=function(x) polySane(x, raw=TRUE, degree=2)
                            , has.no.na=FALSE ) {
+    # TODO: Check that there are sufficient input/output columns
     if(nrow(x) < 2) stop("For some reason lars breaks with only one observation")
     #
     matrices <- regression_matrices( x=x, y=y, idxs=idxs
@@ -268,11 +272,26 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
                                    , input.cols=input.cols, output.cols=output.cols
                                    , modelfun=modelfun
                                    , ...
-                                   , has.no.na=has.no.na)
+                                   , has.no.na=has.no.na )
     #
-    estimations <- apply(matrices$response, 2, function(resp) {
-        lars( matrices$design, resp
-            , type="lasso", intercept=TRUE, normalize=FALSE )
+    adaptive.weights <- if(maybe(adaptive, 0) != 0) {
+        apply(matrices$response, 2, function(resp) {
+            #abs(lm.fit(x=matrices$design, y=scale(resp,scale=F))$coefficients)^adaptive
+            require(MASS)
+            abs(coef(lm.ridge(scale(resp,scale=F) ~ matrices$design, lambda=0.01))[-1])^adaptive
+        })
+    }
+    #
+    estimations <- lapply(setNames(nm=colnames(matrices$response)), function(respn) {
+        resp <- matrices$response[,respn]
+        if(!is.null(adaptive.weights)) {
+            ws <- adaptive.weights[,respn]
+            fit <- lars( matrices$design/rep(ws, each=nrow(matrices$design))
+                       , resp, type="lasso", intercept=TRUE, normalize=FALSE )
+            setattr(fit, "time_table_lars_adaptive", ws)
+        } else {
+            lars(matrices$design, resp, type="lasso", intercept=TRUE, normalize=FALSE)
+        }
     })
     #
     all.coef <- lapply(estimations, function(estimation) {
@@ -283,6 +302,7 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
             predict.lars( estimation
                         , as.data.table(diag(ncol(matrices$design))))$fit -
                             rep(intercepts, each=ncol(matrices$design))
+        non.intercepts <- non.intercepts * attr(estimation, "time_table_lars_adaptive")
         coef <- rbind(intercepts, non.intercepts)
         rownames(coef) <- c("(Intercept)", colnames(matrices$design))
         coef
@@ -302,6 +322,13 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
     result
 }
 
+#' time.table LASSO regression summary
+#'
+#' Gives table containing coefficient estimates and diagonistic data
+#'
+#' @param dp result of \code{time_table_lars} call
+#'
+#' @export
 summary.dynpan_lars <- function(dp) {
     estimations <- dp$estimations
     extr.stats <- function(fac) {
@@ -323,24 +350,64 @@ summary.dynpan_lars <- function(dp) {
     stats
 }
 
-coef.dynpan_lars <- function(dp, ids=NULL) {
-    picks <- if(is.null(ids)) {
-        lapply(dp$nmodel, seq_len)
-    } else if(is.null(names(ids))) {
-        setNames(rep(list(unlist(ids)), length(dp$output.cols)), dp$output.cols)
-    } else {
-        stopifnot(all(names(ids) %in% dp$output.cols))
-        ids
-    }
-    #
-    lapply(setNames(nm=names(picks)), function(fac) {
-        cf <- dp$coef[[fac]]
-        lapply(setNames(nm=picks[[fac]]), function(i) {
-            cf[,i]
+#' time.table LASSO coefficients
+#'
+#' Matrix of parameter estimates from LASSO fit
+#'
+#' @param dp result of \code{time_table_lars} call
+#' @param ids named list containing which models to get coefficients for, should map output.col names from dp to list of model numbers for that column
+#' @param lambda (exact/absolute) shrinkage values for which to extract coefficients, should map output.col names from dp to values
+#' @param fraction fractions of minimal shrinkage at which to extract coefficients, should map output.col names from dp to values
+#'
+#' @details If none of \code{ids}, \code{lamda}, or \code{fraction} are
+#' specified the fits correcponsing to lambda values at which the set of active
+#' terms changes are returned.
+#' 
+#' @export
+coef.dynpan_lars <- function(dp, ids=NULL, lambda=NULL, fraction=NULL) {
+    # NOTE: Hack this in for now
+    if(!is.null(lambda) | !is.null(fraction)) {
+        if((!is.null(lambda) & !is.null(fraction)) | !is.null(ids))
+            stop("Specify only one of 'ids', 'lambda', and 'fraction'")
+        mode <- if(is.null(lambda)) "fraction" else "lambda"
+        valuess <- if(is.null(lambda)) fraction else lambda
+        lapply(setNames(nm=names(valuess)), function(outp) {
+            lapply(setNames(nm=valuess[[outp]]), function(value) {
+                coef(dp$estimations[[outp]], mode=mode, s=value)
+            })
         })
-    })
+    } else {    
+        picks <- if(is.null(ids)) {
+            lapply(dp$nmodel, seq_len)
+        } else if(is.null(names(ids))) {
+            setNames(rep(list(unlist(ids)), length(dp$output.cols)), dp$output.cols)
+        } else {
+            if(!(all(names(ids) %in% dp$output.cols)))
+                stop(paste0( "coef.dynpan_lars: '"
+                           , setdiff(names(ids), dp$output.cols)
+                           , "' is not an output of the regression."
+                           , collapse="\n" ))
+            ids
+        }
+        #
+        lapply(setNames(nm=names(picks)), function(fac) {
+            cf <- dp$coef[[fac]]
+            lapply(setNames(nm=picks[[fac]]), function(i) {
+                cf[,i]
+            })
+        })
+    }
 }
 
+#' time.table LASSO prediction
+#'
+#' Use LASSO fit to predict values for new data
+#'
+#' @param dp result of \code{time_table_lars} call
+#' @param newdata time.table containing (at least) the columns used when fitting \code{dp}
+#' @param ids named list containing which models to predict from, should map output.col names from dp to list of model numbers for that column
+#'
+#' @export
 predict.dynpan_lars <- function(dp, newdata, ids=NULL) {
     data.matrix <- if(is.null(names(newdata))) {
         stopifnot(ncol(newdata) == length(dp$input.cols))

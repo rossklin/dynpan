@@ -278,6 +278,54 @@ test_that("predict.dynpan_leaps produces matrices", {
     }
 })
 
+test_that("dynpan lars ignored incomplete cases", {
+    for(nm in names(test.tables)) {
+        context(paste("Table:", nm))
+        set.seed(346328219)
+        with(test.tables[[nm]], {
+            if(number$timepoints*number$entities > 8 & number$measurement > 0) {
+                tt1 <- copy(tt)
+                perturb_measurement(tt1)
+                tt2 <- copy(tt1)
+                idxs <- sample.int(nrow(tt), 4)
+                cols <- sample(measurement_names(tt), 4, TRUE)
+                #
+                for(i in seq_along(idxs)) {
+                    tt1[idxs[[i]], cols[[i]]] <- NA
+                }
+                tt2 <- subset(tt2, -idxs)
+                #
+                expect_equal(time_table_lars(tt, tt1), time_table_lars(tt, tt2))
+                expect_equal(time_table_lars(tt1, tt), time_table_lars(tt2, tt))
+            }
+        })
+    }
+})
+
+test_that("lars/regression_matrices works when time.table has columns in incorrect order", {
+    for(nm in names(test.tables)) {
+        context(paste("Table:", nm))
+        with(test.tables[[nm]], {
+            if(number$measurement > 1 & number$entities * number$timepoints > 1) {
+                tt1 <- copy(tt)
+                perturb_measurement(tt1)
+                #
+                tt2 <- tt1[,rev(colnames(tt)),with=F]
+                setkeyv(tt2, key(tt1))
+                setattr(tt2,          "id.vars", attr(tt, "id.vars"))
+                setattr(tt2,         "time.var", attr(tt, "time.var"))
+                setattr(tt2, "measurement.vars", attr(tt, "measurement.vars"))
+                setattr(tt2,         "aux.vars", attr(tt, "aux.vars"))
+                setattr(tt2,        "frequency", attr(tt, "frequency"))
+                setattr(tt2,        "class", attr(tt, "class"))
+                #
+                expect_equal(time_table_lars(tt, tt1), time_table_lars(tt, tt2)) 
+                expect_equal(time_table_lars(tt1, tt), time_table_lars(tt2, tt))
+            }
+        })
+    }
+})
+
 
 ## test_that("", {
 ##     for(nm in names(test.tables)) {

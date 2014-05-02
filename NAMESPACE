@@ -1,3 +1,6 @@
+S3method(coef,dynpan_lars)
+S3method(predict,dynpan_lars)
+S3method(summary,dynpan_lars)
 export(constant_weight_function)
 export(flanner_by_measurement)
 export(local_polynomial_derivatives)

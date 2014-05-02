@@ -2,9 +2,10 @@
 \alias{time_table_lars}
 \title{Perform lasso regression on a time.table}
 \usage{
-time_table_lars(x, y = NULL, idxs = NULL, use.auxiliary = FALSE,
-  input.cols = NULL, output.cols = NULL, ..., modelfun = function(x)
-  polySane(x, raw = TRUE, degree = 2), has.no.na = FALSE)
+time_table_lars(x, y = NULL, idxs = NULL, adaptive = 0.5,
+  normalise = TRUE, use.auxiliary = FALSE, input.cols = NULL,
+  output.cols = NULL, ..., modelfun = function(x) polySane(x, raw = TRUE,
+  degree = 2), has.no.na = FALSE)
 }
 \arguments{
   \item{x}{\code{time.table} that contains predictors and,
@@ -15,6 +16,10 @@ time_table_lars(x, y = NULL, idxs = NULL, use.auxiliary = FALSE,
 
   \item{idxs}{index/time values to include, defaults to all
   complete cases}
+
+  \item{adaptive}{exponent used for the adaptive weights
+  set to \code{NULL} or \code{0} to disable (defaults to
+  0.5)}
 
   \item{use.auxiliary}{whether to include auxiliary values}
 
