@@ -136,8 +136,9 @@ lookup_neighbour_trajectories <- function( tt, points, k
     centres <- lookup_neighbour_indices( tt, points, k, only.indices=TRUE
                                        , distance.name=trajectory.distance.name )
     result <- pad_column(centres, time_name(tt), times, time.distance.name)
+    long.and.hopefully.safe.name.not.to.confuse.data.table <- result
     if(!only.indices)
-        result <- subset(tt, index=result)
+        result <- tt[long.and.hopefully.safe.name.not.to.confuse.data.table]
 #    setattr(result, "lookup.neighbour.centres", centres)
     result
 }
@@ -196,6 +197,7 @@ local_polynomial_fits <- function( tt, points, k
     time.distance.name  <- nms[2]
     index.name <- nms[3]
     weight.name <- nms[4]
+    if(!(0 %in% timesteps | 0 %in% times)) stop("timesteps or times should contain 0, e.g. timesteps=seq(-r,r)")
     #
     trajectories <- 
         lookup_neighbour_trajectories( tt, copy(points)[,eval(index.name):=.I], k
@@ -204,7 +206,19 @@ local_polynomial_fits <- function( tt, points, k
                                      , time.distance.name=time.distance.name
                                      , only.indices=FALSE )
     #
+    # NOTE: This centres each trajectory around time point 0
+    #
     mnames <- measurement_names(tt)
+    tsteps <- if(!is.null(timesteps)) length(timesteps) else length(times)
+    centre_point <- trajectories[[time.distance.name]] == 0
+    local_polynomial_fits_safe_name_1 <- trajectories
+    local_polynomial_fits_safe_name_3 <- centre_point
+    for(local_polynomial_fits_safe_name_2 in mnames) {
+        #data.table gets confused if we don't use the magic [,] operator... (internal selfref thing)
+        # This is equivalent to:
+        # trajectories[[col]] <- trajectories[[col]] - rep(trajectories[[col]][centre_points], each=tsteps)
+        trajectories[,eval(local_polynomial_fits_safe_name_2):=.SD[[local_polynomial_fits_safe_name_2]]-rep(local_polynomial_fits_safe_name_1[[local_polynomial_fits_safe_name_2]][local_polynomial_fits_safe_name_3], each=tsteps)]
+    }
     #
     trajectories[, eval(weight.name) :=
                    weight.function( .SD[[trajectory.distance.name]]
