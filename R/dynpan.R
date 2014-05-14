@@ -132,7 +132,7 @@ lookup_neighbour_trajectories <- function( tt, points, k
                                          , trajectory.distance.name="distance"
                                          , time.distance.name="relative" ) {
     stopifnot(xor(is.null(timesteps), is.null(times)))
-    if(is.null(times)) times <- deltat(tt) * timesteps
+    if(is.null(times)) times <- timetablr:::deltat.time.table(tt) * timesteps
     centres <- lookup_neighbour_indices( tt, points, k, only.indices=TRUE
                                        , distance.name=trajectory.distance.name )
     result <- pad_column(centres, time_name(tt), times, time.distance.name)
@@ -286,7 +286,7 @@ local_polynomial_derivatives <- function(tt, k, timesteps=NULL, times=NULL, ...)
 #' @export
 step_derivatives <- function(tt, ...) {
     dtt <- diff(tt)
-    dscale <- deltat(tt)
+    dscale <- timetablr:::deltat.time.table(tt)
     for(col in measurement_names(tt)) {
         dtt[,eval(col):=.SD[[col]]/dscale]
     }
