@@ -278,20 +278,21 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
         apply(matrices$response, 2, function(resp) {
             #abs(lm.fit(x=matrices$design, y=scale(resp,scale=F))$coefficients)^adaptive
             require(MASS)
-            abs(coef(lm.ridge(scale(resp,scale=F) ~ matrices$design, lambda=0.01))[-1])^adaptive
+            abs(coef(lm.ridge(resp ~ matrices$design, lambda=0.01))[-1])^adaptive
         })
+    } else if(normalise) {
+        tmp <- attr(scale(matrices$design), "scaled:scale")
+        apply(matrices$response, 2, function(resp) tmp)
+    } else {
+        apply(matrices$response, 2, function(resp) rep(1, ncol(matrices$design)))
     }
     #
     estimations <- lapply(setNames(nm=colnames(matrices$response)), function(respn) {
         resp <- matrices$response[,respn]
-        if(!is.null(adaptive.weights)) {
-            ws <- adaptive.weights[,respn]
-            fit <- lars( matrices$design/rep(ws, each=nrow(matrices$design))
-                       , resp, type="lasso", intercept=TRUE, normalize=FALSE )
-            setattr(fit, "time_table_lars_adaptive", ws)
-        } else {
-            lars(matrices$design, resp, type="lasso", intercept=TRUE, normalize=FALSE)
-        }
+        ws <- adaptive.weights[,respn]
+        fit <- lars( matrices$design/rep(ws, each=nrow(matrices$design))
+                   , resp, type="lasso", intercept=TRUE, normalize=FALSE )
+        setattr(fit, "time_table_lars_adaptive", ws)
     })
     #
     all.coef <- lapply(estimations, function(estimation) {
