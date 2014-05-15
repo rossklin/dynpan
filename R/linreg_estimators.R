@@ -254,6 +254,7 @@ predict.dynpan_leaps <- function(dp, newdata, ids=NULL) {
 #' @param ... additional arguments to pass to \code{modelfun}
 #' @param modelfun function that produces the actual covariates used in the linear regression
 #' @param has.no.na whether user guarantees \code{x}/\code{y} contian no \code{NA} values
+#' @param adaptive.lambda ridge regression shrinkage parameter to use when calculating adaptive lasso weights
 #' 
 #' @export
 time_table_lars <- function( x, y=NULL, idxs=NULL
@@ -263,7 +264,8 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
                            , input.cols=NULL, output.cols=NULL
                            , ...
                            , modelfun=function(x) polySane(x, raw=TRUE, degree=2)
-                           , has.no.na=FALSE ) {
+                           , has.no.na=FALSE
+                           , adaptive.lambda=0.1 ) {
     # TODO: Check that there are sufficient input/output columns
     if(nrow(x) < 2) stop("For some reason lars breaks with only one observation")
     #
@@ -275,10 +277,11 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
                                    , has.no.na=has.no.na )
     #
     adaptive.weights <- if(maybe(adaptive, 0) != 0) {
+        nw <- attr(scale(matrices$design), "scaled:scale")
         apply(matrices$response, 2, function(resp) {
             #abs(lm.fit(x=matrices$design, y=scale(resp,scale=F))$coefficients)^adaptive
             require(MASS)
-            abs(coef(lm.ridge(resp ~ matrices$design, lambda=0.01))[-1])^adaptive
+            nw*abs(coef(lm.ridge(resp ~ matrices$design, lambda=adaptive.lambda))[-1])^adaptive
         })
     } else if(normalise) {
         tmp <- attr(scale(matrices$design), "scaled:scale")
@@ -317,10 +320,20 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
             , output.cols = matrices$output.cols
             , matrices    = matrices
             , nmodel      = sapply(estimations, function(xs) length(xs$df))
+            , nobs        = nrow(matrices$design)
             , coef        = all.coef
             , estimations = estimations )
     class(result) <- "dynpan_lars"
     result
+}
+
+#' Number of observations used in the regression
+#'
+#' @param dp results from time_table_lars
+#'
+#' @export
+nobs.dynpan_lars <- function(dp) {
+    dp$nobs
 }
 
 #' time.table LASSO regression summary
@@ -338,10 +351,11 @@ summary.dynpan_lars <- function(dp) {
         basic[,lambda:=c(stats[["lambda"]], 0)]
         terms <- as.data.table(t(dp$coef[[fac]]))
         nterm <- rowSums(abs(terms) > .Machine$double.eps)
-        # This isn't quite the same BIC as in leaps, but I think it's correctish
-        # See the lasso/lars papers on the EDF of the LASSO, though I'm not sure
-        # if this is affected by the adaptive correction (seems unlikely)
-        n <- nrow(dp$matrices$design)
+        ## This isn't quite the same BIC as in leaps, but I think it's correctish
+        ## See the lasso/lars papers on the EDF of the LASSO, though I'm not sure
+        ## if this is affected by the adaptive correction (seems unlikely)
+        ## n <- nrow(dp$matrices$design)
+        n <- nobs.dynpan_lars(dp)
         BICf <- function(RSS) n + n*log(2*pi) + n*log(RSS/n) + log(n)*nterm
         data.table(basic, nterm=nterm, Term=terms)[,BIC:=BICf(RSS)]
     }
@@ -349,6 +363,16 @@ summary.dynpan_lars <- function(dp) {
         data.table(factor=names(estimations))[,extr.stats(factor), by="factor"]
     stats[,method:="lasso.lars"]
     stats
+}
+
+#' Remove matrices from lars result to reduce memory footprint
+#'
+#' @param dp result from time_table_lars
+#'
+#' @export 
+remove_matrices <- function(dp) {
+    dp$matrices <- NULL
+    dp
 }
 
 #' time.table LASSO coefficients
