@@ -276,24 +276,30 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
                                    , ...
                                    , has.no.na=has.no.na )
     #
+    scaled.design <- scale(matrices$design)
     adaptive.weights <- if(maybe(adaptive, 0) != 0) {
-        nw <- attr(scale(matrices$design), "scaled:scale")
+        nw <- attr(scaled.design, "scaled:scale")
         apply(matrices$response, 2, function(resp) {
             #abs(lm.fit(x=matrices$design, y=scale(resp,scale=F))$coefficients)^adaptive
             require(MASS)
-            nw*abs(coef(lm.ridge(resp ~ matrices$design, lambda=adaptive.lambda))[-1])^adaptive
+            setNames( (abs(coef(lm.ridge(resp ~ scaled.design, lambda=adaptive.lambda))[-1])^adaptive)/nw
+                    , names(nw) )
         })
+    ## TODO: Create vectors with the correct names instead of this ridiculous solution
+    ## (it's just that I don't trust R to be consistent anywhere, so I try to keep the
+    ## exact same tyope of function call (apply) to make sure names are given consistently...
     } else if(normalise) {
-        tmp <- attr(scale(matrices$design), "scaled:scale")
-        apply(matrices$response, 2, function(resp) tmp)
+        nw <- attr(scaled.design, "scaled:scale")
+        apply(matrices$response, 2, function(resp) nw)
     } else {
         apply(matrices$response, 2, function(resp) rep(1, ncol(matrices$design)))
     }
+    rm(scaled.design)
     #
     estimations <- lapply(setNames(nm=colnames(matrices$response)), function(respn) {
         resp <- matrices$response[,respn]
         ws <- adaptive.weights[,respn]
-        fit <- lars( matrices$design/rep(ws, each=nrow(matrices$design))
+        fit <- lars( matrices$design*rep(ws, each=nrow(matrices$design))
                    , resp, type="lasso", intercept=TRUE, normalize=FALSE )
         setattr(fit, "time_table_lars_adaptive", ws)
     })
@@ -322,7 +328,8 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
             , nmodel      = sapply(estimations, function(xs) length(xs$df))
             , nobs        = nrow(matrices$design)
             , coef        = all.coef
-            , estimations = estimations )
+            , estimations = estimations
+            , adaptive.weights = adaptive.weights )
     class(result) <- "dynpan_lars"
     result
 }
@@ -385,11 +392,12 @@ remove_matrices <- function(dp) {
 #' @param fraction fractions of minimal shrinkage at which to extract coefficients, should map output.col names from dp to values
 #'
 #' @details If none of \code{ids}, \code{lamda}, or \code{fraction} are
-#' specified the fits correcponsing to lambda values at which the set of active
+#' specified the fits corresponding to lambda values at which the set of active
 #' terms changes are returned.
 #' 
 #' @export
 coef.dynpan_lars <- function(dp, ids=NULL, lambda=NULL, fraction=NULL) {
+    adaptive.weights <- dp$adaptive.weights
     # NOTE: Hack this in for now
     if(!is.null(lambda) | !is.null(fraction)) {
         if((!is.null(lambda) & !is.null(fraction)) | !is.null(ids))
@@ -398,7 +406,7 @@ coef.dynpan_lars <- function(dp, ids=NULL, lambda=NULL, fraction=NULL) {
         valuess <- if(is.null(lambda)) fraction else lambda
         lapply(setNames(nm=names(valuess)), function(outp) {
             lapply(setNames(nm=valuess[[outp]]), function(value) {
-                coef(dp$estimations[[outp]], mode=mode, s=value)
+                coef(dp$estimations[[outp]], mode=mode, s=value)*adaptive.weights[,outp]
             })
         })
     } else {    
