@@ -153,7 +153,7 @@ lookup_neighbour_trajectories <- function( tt, points, k
 #' @param h gaussian kernel bandwidth
 #'
 #' @export
-simple_weight_function <- function(d, dt, h=0.1) exp(-d/h - abs(dt))
+simple_weight_function <- function(d, dt, h=1, k=1) exp(-d/h - abs(dt)/k)
 
 #' Constant weight function
 #'

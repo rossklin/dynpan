@@ -277,13 +277,19 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
                                    , has.no.na=has.no.na )
     #
     scaled.design <- scale(matrices$design)
-    adaptive.weights <- if(maybe(adaptive, 0) != 0) {
+    adaptive.weights <- if(maybe(adaptive, 0) != 0 & normalise) {
         nw <- attr(scaled.design, "scaled:scale")
         apply(matrices$response, 2, function(resp) {
             #abs(lm.fit(x=matrices$design, y=scale(resp,scale=F))$coefficients)^adaptive
             require(MASS)
             setNames( (abs(coef(lm.ridge(resp ~ scaled.design, lambda=adaptive.lambda))[-1])^adaptive)/nw
                     , names(nw) )
+        })
+    } else if(maybe(adaptive, 0) != 0) {
+        apply(matrices$response, 2, function(resp) {
+            require(MASS)
+            setNames( abs(coef(lm.ridge(resp ~ matrices$design, lambda=adaptive.lambda))[-1])^adaptive
+                    , colnames(matrices$design) )
         })
     ## TODO: Create vectors with the correct names instead of this ridiculous solution
     ## (it's just that I don't trust R to be consistent anywhere, so I try to keep the
@@ -296,10 +302,12 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
     }
     rm(scaled.design)
     #
+    # TODO: All of this and most of the above is a mess...
     estimations <- lapply(setNames(nm=colnames(matrices$response)), function(respn) {
         resp <- matrices$response[,respn]
         ws <- adaptive.weights[,respn]
-        fit <- lars( matrices$design*rep(ws, each=nrow(matrices$design))
+        m <- if(normalise) scale(matrices$design, scale=F) else matrices$design
+        fit <- lars( m*rep(ws, each=nrow(m))
                    , resp, type="lasso", intercept=TRUE, normalize=FALSE )
         setattr(fit, "time_table_lars_adaptive", ws)
     })
