@@ -268,51 +268,53 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
                            , adaptive.lambda=0.1 ) {
     # TODO: Check that there are sufficient input/output columns
     if(nrow(x) < 2) stop("For some reason lars breaks with only one observation")
-    #
+    ##
     matrices <- regression_matrices( x=x, y=y, idxs=idxs
                                    , use.auxiliary=use.auxiliary
                                    , input.cols=input.cols, output.cols=output.cols
                                    , modelfun=modelfun
                                    , ...
                                    , has.no.na=has.no.na )
-    #
-    scaled.design <- scale(matrices$design)
-    adaptive.weights <- if(maybe(adaptive, 0) != 0 & normalise) {
-        nw <- attr(scaled.design, "scaled:scale")
+    ##
+    scaled.design <- if(normalise) {
+        scale(matrices$design)
+    } else {
+        m <- matrices$design
+        attr(m, "scaled:scale") <- rep(1, ncol(m))
+        setattr(m, "scaled:center", rep(0, ncol(m)))
+        m
+    }
+    ##
+    adaptive.weights <- if(maybe(adaptive, 0)) {
         apply(matrices$response, 2, function(resp) {
             #abs(lm.fit(x=matrices$design, y=scale(resp,scale=F))$coefficients)^adaptive
             require(MASS)
-            setNames( (abs(coef(lm.ridge(resp ~ scaled.design, lambda=adaptive.lambda))[-1])^adaptive)/nw
-                    , names(nw) )
+            abs(coef(lm.ridge(resp ~ scaled.design, lambda=adaptive.lambda))[-1])^adaptive
         })
-    } else if(maybe(adaptive, 0) != 0) {
-        apply(matrices$response, 2, function(resp) {
-            require(MASS)
-            setNames( abs(coef(lm.ridge(resp ~ matrices$design, lambda=adaptive.lambda))[-1])^adaptive
-                    , colnames(matrices$design) )
-        })
-    ## TODO: Create vectors with the correct names instead of this ridiculous solution
-    ## (it's just that I don't trust R to be consistent anywhere, so I try to keep the
-    ## exact same tyope of function call (apply) to make sure names are given consistently...
-    } else if(normalise) {
-        nw <- attr(scaled.design, "scaled:scale")
-        apply(matrices$response, 2, function(resp) nw)
     } else {
-        apply(matrices$response, 2, function(resp) rep(1, ncol(matrices$design)))
+        matrix(rep(1, ncol(matrices$response)*ncol(scaled.design)), ncol(scaled.design))
     }
-    rm(scaled.design)
-    #
-    # TODO: All of this and most of the above is a mess...
+    colnames(adaptive.weights) <- colnames(matrices$response)
+    rownames(adaptive.weights) <- colnames(matrices$design)
+    ##
+    design.translations <- attr(scaled.design, "scaled:center")
+    names(design.translations) <- colnames(matrices$design)
+    design.scalings <- adaptive.weights/attr(scaled.design, "scaled:scale")
+    colnames(design.scalings) <- colnames(matrices$response)
+    rownames(design.scalings) <- colnames(matrices$design)
+    ##
     estimations <- lapply(setNames(nm=colnames(matrices$response)), function(respn) {
         resp <- matrices$response[,respn]
         ws <- adaptive.weights[,respn]
-        m <- if(normalise) scale(matrices$design, scale=F) else matrices$design
-        fit <- lars( m*rep(ws, each=nrow(m))
-                   , resp, type="lasso", intercept=TRUE, normalize=FALSE )
-        setattr(fit, "time_table_lars_adaptive", ws)
+        lars( sweep(scaled.design, 2, ws, `*`)
+            , resp, type="lasso", intercept=TRUE, normalize=FALSE )
     })
-    #
-    all.coef <- lapply(estimations, function(estimation) {
+    rm(scaled.design)
+    ##
+    ## TODO: All this should proably be removed, we juse use the LARS build in extraction
+    ## thing instead...
+    all.coef <- lapply(names(estimations), function(fac) {
+        estimation <- estimations[[fac]]
         intercepts <- predict.lars( estimation
                                   , newx=as.data.table(rep(list(0)
                                         , ncol(matrices$design))))$fit
@@ -320,7 +322,10 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
             predict.lars( estimation
                         , as.data.table(diag(ncol(matrices$design))))$fit -
                             rep(intercepts, each=ncol(matrices$design))
-        non.intercepts <- non.intercepts * attr(estimation, "time_table_lars_adaptive")
+        ##
+        non.intercepts <- non.intercepts * design.scalings[,fac]
+        intercepts <- intercepts - as.numeric(design.translations %*% non.intercepts)
+        ##
         coef <- rbind(intercepts, non.intercepts)
         rownames(coef) <- c("(Intercept)", colnames(matrices$design))
         coef
@@ -337,7 +342,9 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
             , nobs        = nrow(matrices$design)
             , coef        = all.coef
             , estimations = estimations
-            , adaptive.weights = adaptive.weights )
+            , adaptive.weights    = adaptive.weights
+            , design.translations = design.translations
+            , design.scalings     = design.scalings )
     class(result) <- "dynpan_lars"
     result
 }
@@ -350,6 +357,19 @@ time_table_lars <- function( x, y=NULL, idxs=NULL
 nobs.dynpan_lars <- function(dp) {
     dp$nobs
 }
+
+## uses translation/scaling info from dp to correct a matrix/data.frame of
+## parameter estimates, assumes everything is in the expected order!
+## correct.estimate <- function(dp, coefs, factor) {
+##     trans <- dp$design.translations
+##     trans[is.na(trans)] <- 0
+##     ##
+##     scalefac <- dp$design.scalings[colnames(coefs),factor]
+##     scalefac[is.na(scalefac)] <- 1
+##     ##
+##     coefs[,1] <- c(, rep(0, length(dp$input.cols))
+##     coefs*c(1, dp$design.scalings)
+## }
 
 #' time.table LASSO regression summary
 #'
@@ -364,7 +384,7 @@ summary.dynpan_lars <- function(dp) {
         stats <- estimations[[fac]]
         basic <- as.data.table(stats[c("Cp", "R2", "RSS")])
         basic[,lambda:=c(stats[["lambda"]], 0)]
-        terms <- as.data.table(t(dp$coef[[fac]]))
+        terms <- t(dp$coef[[fac]])
         nterm <- rowSums(abs(terms) > .Machine$double.eps)
         ## This isn't quite the same BIC as in leaps, but I think it's correctish
         ## See the lasso/lars papers on the EDF of the LASSO, though I'm not sure
@@ -398,14 +418,14 @@ remove_matrices <- function(dp) {
 #' @param ids named list containing which models to get coefficients for, should map output.col names from dp to list of model numbers for that column
 #' @param lambda (exact/absolute) shrinkage values for which to extract coefficients, should map output.col names from dp to values
 #' @param fraction fractions of minimal shrinkage at which to extract coefficients, should map output.col names from dp to values
+#' @param include.intercept whether to include the intercept parameter (defaults to FALSE for legacy reasons)
 #'
 #' @details If none of \code{ids}, \code{lamda}, or \code{fraction} are
 #' specified the fits corresponding to lambda values at which the set of active
 #' terms changes are returned.
 #' 
 #' @export
-coef.dynpan_lars <- function(dp, ids=NULL, lambda=NULL, fraction=NULL) {
-    adaptive.weights <- dp$adaptive.weights
+coef.dynpan_lars <- function(dp, ids=NULL, lambda=NULL, fraction=NULL, include.intercept=FALSE) {
     # NOTE: Hack this in for now
     if(!is.null(lambda) | !is.null(fraction)) {
         if((!is.null(lambda) & !is.null(fraction)) | !is.null(ids))
@@ -414,10 +434,18 @@ coef.dynpan_lars <- function(dp, ids=NULL, lambda=NULL, fraction=NULL) {
         valuess <- if(is.null(lambda)) fraction else lambda
         lapply(setNames(nm=names(valuess)), function(outp) {
             lapply(setNames(nm=valuess[[outp]]), function(value) {
-                coef(dp$estimations[[outp]], mode=mode, s=value)*adaptive.weights[,outp]
+                non.intercepts <- coef(dp$estimations[[outp]], mode=mode, s=value)*dp$design.scalings[,outp]
+                intercept <- if(include.intercept) {
+                    nulldata <- as.data.frame(matrix(0, nrow=1, ncol=length(dp$input.cols)))
+                    colnames(nulldata) <- dp$input.cols
+                    correction <- as.numeric(dp$design.translations %*% non.intercepts)
+                    intercept <- predict(dp$estimations[[outp]], newx=nulldata, mode=mode, s=value)$fit
+                    setNames(intercept - correction, "(Intercept)")
+                } else numeric()
+                c(intercept, non.intercepts)
             })
         })
-    } else {    
+    } else {
         picks <- if(is.null(ids)) {
             lapply(dp$nmodel, seq_len)
         } else if(is.null(names(ids))) {
@@ -434,7 +462,10 @@ coef.dynpan_lars <- function(dp, ids=NULL, lambda=NULL, fraction=NULL) {
         lapply(setNames(nm=names(picks)), function(fac) {
             cf <- dp$coef[[fac]]
             lapply(setNames(nm=picks[[fac]]), function(i) {
-                cf[,i]
+                if(include.intercept)
+                    cf[,i]
+                else
+                    cf[-1,i]
             })
         })
     }
@@ -450,6 +481,7 @@ coef.dynpan_lars <- function(dp, ids=NULL, lambda=NULL, fraction=NULL) {
 #'
 #' @export
 predict.dynpan_lars <- function(dp, newdata, ids=NULL) {
+    stop("currently incorrect!")
     data.matrix <- if(is.null(names(newdata))) {
         stopifnot(ncol(newdata) == length(dp$input.cols))
         as.matrix(newdata)
