@@ -2,7 +2,7 @@
 \alias{simple_weight_function}
 \title{A simple and stupid weight function}
 \usage{
-simple_weight_function(d, dt, h = 0.1)
+simple_weight_function(d, dt, h = 1, k = 1)
 }
 \arguments{
   \item{d}{trajectory distance}

@@ -5,7 +5,7 @@
 time_table_lars(x, y = NULL, idxs = NULL, adaptive = 0.5,
   normalise = TRUE, use.auxiliary = FALSE, input.cols = NULL,
   output.cols = NULL, ..., modelfun = function(x) polySane(x, raw = TRUE,
-  degree = 2), has.no.na = FALSE)
+  degree = 2), has.no.na = FALSE, adaptive.lambda = 0.1)
 }
 \arguments{
   \item{x}{\code{time.table} that contains predictors and,
@@ -37,6 +37,9 @@ time_table_lars(x, y = NULL, idxs = NULL, adaptive = 0.5,
 
   \item{has.no.na}{whether user guarantees
   \code{x}/\code{y} contian no \code{NA} values}
+
+  \item{adaptive.lambda}{ridge regression shrinkage
+  parameter to use when calculating adaptive lasso weights}
 }
 \description{
 Perform lasso regression on a time.table
