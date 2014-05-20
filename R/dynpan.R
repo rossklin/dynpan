@@ -285,10 +285,32 @@ local_polynomial_derivatives <- function(tt, k, timesteps=NULL, times=NULL, ...)
 #'
 #' @export
 step_derivatives <- function(tt, ...) {
+    if(inherits(tt[[time_name(tt)]], "numeric"))
+        warning("step_deriatives does not work well with floating point times, use of irregular_derivatives is recommended.")
     dtt <- diff(tt)
     dscale <- timetablr:::deltat.time.table(tt)
     for(col in measurement_names(tt)) {
         dtt[,eval(col):=.SD[[col]]/dscale]
     }
     dtt
+}
+
+#' Compute timestep derivatives in the abscence of regular timesteps
+#'
+#' @param tt \code{time.table} to estimate derivative of points in
+#'
+#' @export
+irregular_derivatives <- function(tt) {
+    if(any(is.na(tt))) warning("irregular_derivatives is not invariant under addition of incomplete columns.")
+    tt2 <- copy(tt)
+    long.and.safe.name.for.time <- time_name(tt2)
+    long.and.safe.name.for.diff <- diff
+    long.and.safe.name.for.c <- c
+    for(long.and.safe.name.for.col in measurement_names(tt2)) {
+        ## equivalent to
+        ## tt2[, eval(col):=c(diff(.SD[[col]])/diff(.SD[[time]]), NA), by=index_names(tt) ]
+        tt2[, eval(long.and.safe.name.for.col):=long.and.safe.name.for.c(long.and.safe.name.for.diff(.SD[[long.and.safe.name.for.col]])/long.and.safe.name.for.diff(.SD[[long.and.safe.name.for.time]]), NA)
+            , by=eval(index_names(tt)) ]
+    }
+    same_str_as(tt2, tt)
 }
