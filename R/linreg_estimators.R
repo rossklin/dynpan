@@ -477,10 +477,13 @@ coef.dynpan_lars <- function(dp, ids=NULL, lambda=NULL, fraction=NULL, include.i
 #'
 #' @param dp result of \code{time_table_lars} call
 #' @param newdata time.table containing (at least) the columns used when fitting \code{dp}
-#' @param ids named list containing which models to predict from, should map output.col names from dp to list of model numbers for that column
-#'
+#' @param ids see coef.dynpan_lars
+#' @param lambda see coef.dynpan_lars
+#' @param fraction see coef.dynpan_lars
+#' @param keep.all.cols whether results should contain copies of all columns from dp
+#' 
 #' @export
-predict.dynpan_lars <- function(dp, newdata=NULL, ids=NULL, lambda=NULL, fraction=NULL) {
+predict.dynpan_lars <- function(dp, newdata=NULL, ids=NULL, lambda=NULL, fraction=NULL, keep.all.cols=FALSE) {
     data.matrix <- if(is.null(names(newdata))) {
         stopifnot(ncol(newdata) == length(dp$input.cols))
         as.matrix(newdata)
@@ -528,7 +531,10 @@ predict.dynpan_lars <- function(dp, newdata=NULL, ids=NULL, lambda=NULL, fractio
     })
     ##
     lapply(seq_along(values[[1]]), function(i) {
-        if(length(other.data.vars) > 0)
+        if(keep.all.cols)
+            cbind( newdata
+                 , do.call(data.frame, lapply(predicted, function(xs) xs[,i])) )
+        else if(length(other.data.vars) > 0)
             cbind( as.data.table(newdata)[,other.data.vars,with=FALSE]
                  , do.call(data.frame, lapply(predicted, function(xs) xs[,i])) )
         else do.call(data.frame, lapply(predicted, function(xs) xs[,i]))
