@@ -480,37 +480,72 @@ coef.dynpan_lars <- function(dp, ids=NULL, lambda=NULL, fraction=NULL, include.i
 #' @param ids named list containing which models to predict from, should map output.col names from dp to list of model numbers for that column
 #'
 #' @export
-predict.dynpan_lars <- function(dp, newdata, ids=NULL) {
-    stop("currently incorrect!")
+predict.dynpan_lars <- function(dp, newdata=NULL, ids=NULL, lambda=NULL, fraction=NULL) {
     data.matrix <- if(is.null(names(newdata))) {
         stopifnot(ncol(newdata) == length(dp$input.cols))
         as.matrix(newdata)
     } else {
         stopifnot(all(dp$input.cols %in% names(newdata)))
-        as.matrix(newdata[,dp$input.cols,with=F])
+        as.matrix(as.data.table(newdata)[,dp$input.cols,with=F])
     }
     colnames(data.matrix) <- dp$input.cols
-    #
+    ##
     other.data.vars <- if(is.null(names(newdata))) {
         character()
     } else {
         setdiff(colnames(newdata), dp$input.cols)
     }
-    design.matrix <- dp$modelfun(data.matrix)
     estimations <- dp$estimations
-    #
-    lapply(setNames(nm=names(ids)), function(fac) {
-        estimation <- estimations[[fac]]
-        lapply(setNames(nm=ids[[fac]]), function(id) {
-            predicted <- do.call( data.table
-                                , setNames(nm=fac,
-                                    list(predict.lars( estimation
-                                                     , design.matrix
-                                                     , s=id )$fit)) )
-            if(length(other.data.vars) > 0)
-                cbind(newdata[,other.data.vars,with=FALSE], predicted)
-            else
-                predicted
-        })
+    ##
+    if(sum(c(!is.null(lambda), !is.null(fraction), !is.null(ids))) != 1)
+        stop("Specify exactly one of 'ids', 'lambda', and 'fraction'")
+    mode <- if(!is.null(lambda))  {
+        if(!local({ n <- sapply(lambda, length); min(n) == max(n)}))
+            stop("different number of lambdas supplied")
+        if(!all(names(lambda) %in% dp$output.cols))
+            stop("lambda must be given as a list mapping output columns to lambda values")
+        "lambda"
+    } else if(!is.null(fraction)) {
+        if(!local({ n <- sapply(fraction, length); min(n) == max(n)}))
+            stop("different number of fractions supplied")
+        if(!all(names(fraction) %in% dp$output.cols))
+            stop("fractions must be given as a list mapping output columns to fractions")
+        "fraction"
+    } else {
+        if(!local({ n <- sapply(ids, length); min(n) == max(n)}))
+            stop("different number of fractions supplied")
+        if(!all(names(ids) %in% dp$output.cols))
+            stop("fractions must be given as a list mapping output columns to fractions")
+        "step"
+    }
+    values <- if(!is.null(lambda)) { lambda } else if(!is.null(fraction)) { fraction } else ids
+    predicted <- lapply(setNames(nm=names(values)), function(fac) {
+        design.matrix <-
+            sweep( sweep( dp$modelfun(data.matrix)
+                        , 2, dp$design.translations, `-` )
+                 , 2, dp$design.scalings[,fac], `*` )
+        predict(dp$estimations[[fac]], newx=design.matrix, type="fit", mode=mode, s=values[[fac]])$fit
     })
+    ##
+    lapply(seq_along(values[[1]]), function(i) {
+        if(length(other.data.vars) > 0)
+            cbind( as.data.table(newdata)[,other.data.vars,with=FALSE]
+                 , do.call(data.frame, lapply(predicted, function(xs) xs[,i])) )
+        else do.call(data.frame, lapply(predicted, function(xs) xs[,i]))
+    })
+    ##
+    ## lapply(setNames(nm=names(ids)), function(fac) {
+    ##     estimation <- estimations[[fac]]
+    ##     lapply(setNames(nm=ids[[fac]]), function(id) {
+    ##         predicted <- do.call( data.table
+    ##                             , setNames(nm=fac,
+    ##                                 list(predict.lars( estimation
+    ##                                                  , design.matrix
+    ##                                                  , s=id )$fit)) )
+    ##         if(length(other.data.vars) > 0)
+    ##             cbind(as.data.table(newdata)[,other.data.vars,with=FALSE], predicted)
+    ##         else
+    ##             predicted
+    ##     })
+    ## })
 }
