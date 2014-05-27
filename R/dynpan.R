@@ -226,9 +226,10 @@ local_polynomial_fits <- function( tt, points, k
     #
     diff <- if(length(mnames) > 1) {
         ## TODO: Is this really faster?
+        # For some bloody reason .SD[,mnames,with=F] dies...
         trajectories[, unname(as.list(coef(
             #
-            lm( as.matrix(.SD[,mnames,with=F]) ~ poly( .SD[[time.distance.name]]
+            lm( as.matrix(as.data.frame(.SD)[,mnames]) ~ poly( .SD[[time.distance.name]]
                                                      , degree=degree, raw=T )
               , weight=.SD[[weight.name]] )
             #
@@ -236,7 +237,7 @@ local_polynomial_fits <- function( tt, points, k
     } else {
         trajectories[, coef(
             #
-            lm( as.matrix(.SD[,mnames,with=F]) ~ poly( .SD[[time.distance.name]]
+            lm( as.matrix(as.data.frame(.SD)[,mnames]) ~ poly( .SD[[time.distance.name]]
                                                      , degree=degree, raw=T )
               , weight=.SD[[weight.name]] )
             #
