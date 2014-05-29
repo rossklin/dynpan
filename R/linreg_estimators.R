@@ -186,8 +186,14 @@ coef.dynpan_leaps <- function(dp, ids=NULL) {
         stopifnot(all(names(ids) %in% dp$output.cols))
         ids
     }
-    #
-    design.matrix <- dp$matrices$design
+    ## NOTE: Just an ugly hack, change time_table_leaps to make this nice :P
+    design.matrix <- if(!is.null(dp$matrices$design)) {
+        dp$matrices$design
+    } else {
+        tmp <- matrix(ncol=length(dp$input.cols), nrow=2, 0)
+        colnames(tmp) <- dp$input.cols
+        dp$modelfun(tmp)
+    }
     lapply(setNames(nm=names(picks)), function(fac) {
         estimation <- dp$estimations[[fac]]
         lapply(picks[[fac]], function(id) {
