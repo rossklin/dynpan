@@ -6,7 +6,7 @@ Maintainer: Tilo Wiklund <tilo@wiklund.co>
 Authors@R: "Tilo Wiklund <tilo@wiklund.co> [aut, cre]"
 Description: Procedures for estimating shared dynamics for multiple time series.
 Depends: R (>= 3.0.1)
-Imports: data.table (>= 1.8), flanner (>= 0.1), timetablr (>= 0.1)
-Suggests: testthat (>= 0.8), randat (>= 0.1), leaps, lars
+Imports: data.table (>= 1.8), flanner (>= 0.1), timetablr (>= 0.1), lars, leaps
+Suggests: testthat (>= 0.8), randat (>= 0.1)
 License: BSD_3_clause + file LICENSE
 LazyData: true
