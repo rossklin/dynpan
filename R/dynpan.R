@@ -188,6 +188,7 @@ constant_weight_function <- function(d, dt) 1
 #' 
 #' @export
 local_polynomial_fits <- function( tt, points, k
+                                 , state.radius = 0
                                  , timesteps=NULL, times=NULL
                                  , degree=2
                                  , weight.function=constant_weight_function
@@ -204,7 +205,8 @@ local_polynomial_fits <- function( tt, points, k
                                      , timesteps, times
                                      , trajectory.distance.name=trajectory.distance.name
                                      , time.distance.name=time.distance.name
-                                     , only.indices=FALSE )
+                                    , only.indices=FALSE )
+
     #
     # NOTE: This centres each trajectory around time point 0
     #
@@ -222,7 +224,13 @@ local_polynomial_fits <- function( tt, points, k
     #
     trajectories[, eval(weight.name) :=
                    weight.function( .SD[[trajectory.distance.name]]
-                                  , .SD[[time.distance.name]] ) ]
+                                 , .SD[[time.distance.name]] ) ]
+
+    if (state.radius > 0){
+        ## remove trajectories outside state space radius
+        trajectories <- trajectories[trajectories[[trajectory.distance.name]] < state.radius]
+    }
+    
     #
     diff <- if(length(mnames) > 1) {
         ## TODO: Is this really faster?
